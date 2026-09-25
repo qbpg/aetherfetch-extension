@@ -1,44 +1,43 @@
-<p align="center"><img src="logo.svg" alt="AetherFetch" width="68"></p>
+<p align="center"><img src="logo.svg" alt="AetherFetch logo" width="68"></p>
 
 # AetherFetch Extension
 
+<p align="center">
+  <a href="https://addons.mozilla.org/"><img alt="Mozilla" src="https://img.shields.io/badge/Mozilla-compatible-111111?style=for-the-badge&logo=mozilla&logoColor=white"></a>
+  <a href="https://librewolf.net/"><img alt="LibreWolf" src="https://img.shields.io/badge/LibreWolf-compatible-111111?style=for-the-badge&logo=librewolf&logoColor=white"></a>
+  <a href="#microsoft-edge"><img alt="Microsoft Edge" src="https://img.shields.io/badge/Microsoft%20Edge-manual%20install-111111?style=for-the-badge&logo=microsoftedge&logoColor=white"></a>
+  <a href="https://vercel.com/"><img alt="Vercel" src="https://img.shields.io/badge/Vercel-web%20app-111111?style=for-the-badge&logo=vercel&logoColor=white"></a>
+</p>
+
 ![AetherFetch extension banner](banner.png)
 
-A temporary inbox inside a browser popup for **Microsoft Edge and Mozilla Firefox**. Click the toolbar icon whenever a website asks for an email address. Create an address, copy it into the sign-up form, then read incoming messages and copy verification codes or open activation links without leaving the popup.
+Create a temporary inbox right in your browser. Copy the address into a sign-up form, read incoming mail, copy verification codes, and open links from messages. Built for Mozilla-based browsers and Microsoft Edge.
 
-## Features
+## What it does
 
-- Generate a temporary address using an available AetherFetch domain.
-- Switch between addresses created in the extension.
-- Check incoming messages in the popup and read plain text or text extracted from HTML mail.
-- Detect verification codes and display clickable links from both plain-text and HTML messages. Links open only when clicked, in a new tab; the destination domain is shown for HTML links.
-- Refresh every 60 seconds **while the popup is open**. Recent results and available domains are cached to avoid repeated API requests.
-- If the mail service returns a rate limit, display a countdown and pause address creation and refresh across popup reopenings. The copy button remains available for an address already created.
+- Create several temporary addresses, each with an optional label.
+- Read messages and open links from plain-text or HTML email.
+- Click **Open dashboard** to add the extension's addresses to [AetherFetch](https://aetherfetch.vercel.app/) in the same browser profile. The selected address becomes the active website session. Existing website accounts and their favorites or archived state are preserved.
+- Refresh while the popup is open, with cached results and a countdown when the mail service is rate limited.
 
-The extension uses [AetherFetch's existing mailbox API](https://aetherfetch.vercel.app/) and its mail.tm-backed delivery. Addresses created in the extension are separate from those saved on the website. There is no automatic access to the current tab, no code injection into websites, and no background polling.
+Addresses are shared with the website **when you click Open dashboard**. The extension only accesses the AetherFetch domain. It does not inject code into the other websites you visit.
 
 ## Install
 
-### Edge
+### Mozilla browsers (Firefox and LibreWolf)
 
-1. Download the repository as a ZIP and extract it.
-2. Open `edge://extensions`, switch on **Developer mode**, and click **Load unpacked**.
-3. Select the extracted directory containing `manifest.json`.
+The Mozilla Add-ons listing is not available yet. To test the extension temporarily, extract the [latest release ZIP](https://github.com/qbpg/aetherfetch-extension/releases/latest), open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and choose `manifest.json`. Temporary add-ons disappear after a browser restart. Permanent installation needs Mozilla signing.
 
-Open AetherFetch from the browser toolbar. Opening `popup.html` as a normal web page does not provide extension storage or API permissions.
+### Microsoft Edge
 
-### Firefox
+Download the [latest release ZIP](https://github.com/qbpg/aetherfetch-extension/releases/latest), extract it, open `edge://extensions`, turn on **Developer mode**, click **Load unpacked**, and select the folder containing `manifest.json`. Edge installation is by files; this project has no Edge Add-ons listing.
 
-1. Download the repository as a ZIP and extract it.
-2. Open `about:debugging#/runtime/this-firefox` and click **Load Temporary Add-on**.
-3. Select `manifest.json`. This temporary installation is removed when Firefox restarts. Permanent installation requires a signed add-on.
+Open AetherFetch from the toolbar. Opening `popup.html` directly does not grant extension permissions.
 
 ## Privacy
 
-The extension asks for access to `https://aetherfetch.vercel.app/*` to call its mailbox API and uses browser `storage.local` to keep its created addresses, passwords and access tokens on this device. It reads email content only when you open a message. Avoid temporary mailboxes for important or long-term accounts. Anyone with access to your browser profile may be able to access stored inboxes. Remove the extension to clear its saved data.
-
-The only network requests made by the popup are to AetherFetch's mailbox API, plus verification links you explicitly open. The browser may still fetch the website when you choose **Open website**.
+The extension stores its addresses, labels, generated passwords, and access tokens in browser `storage.local`. It uses AetherFetch's existing mail.tm-backed API. When you click **Open dashboard**, it copies those accounts to the website's own `localStorage` and activates the selected session. Anyone with access to your browser profile may be able to access saved inboxes. Avoid temporary email for important or long-term accounts. See [Privacy details](PRIVACY.md).
 
 ## License
 
-[MIT](LICENSE). Created by **qbpg**.
+[MIT](LICENSE) · Created by **qbpg**.
