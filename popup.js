@@ -1,6 +1,8 @@
 /* AetherFetch popup: no page injection, external scripts, or HTML rendering. */
 const API = 'https://aetherfetch.vercel.app/api/mailbox';
 const storage = globalThis.chrome?.storage?.local || globalThis.browser?.storage?.local;
+const tabs = globalThis.browser?.tabs || globalThis.chrome?.tabs;
+const scripting = globalThis.browser?.scripting || globalThis.chrome?.scripting;
 const $ = (id) => document.getElementById(id);
 let accounts = [];
 let active = 0;
@@ -19,8 +21,10 @@ function remaining() { return Math.max(0, Math.ceil((retryAt - Date.now()) / 100
 function updateButtons() {
   const waiting = remaining() > 0;
   $('new').disabled = !storage || loading || waiting;
+  $('create').disabled = !storage || loading || waiting;
   $('refresh').disabled = !current() || loading || refreshing || waiting;
   $('copy').disabled = !current();
+  $('dashboard').disabled = !current()?.token || !tabs || !scripting;
   const emptyButton = $('new-empty');
   if (emptyButton) emptyButton.disabled = !storage || loading || waiting;
 }
@@ -89,6 +93,12 @@ function members(data) {
   return Array.isArray(list) ? list : [];
 }
 
+function showCreateForm() {
+  if (loading || remaining() || !storage) return;
+  $('new-form').hidden = false;
+  $('label').focus();
+}
+
 async function createAddress() {
   if (loading || !storage || remaining()) return;
   loading = true; updateButtons(); status('Creating your address…');
@@ -104,9 +114,11 @@ async function createAddress() {
     const address = `${randomPart()}@${domain}`;
     const password = `${randomPart(16)}A1!`;
     const account = await request('/accounts', { method: 'POST', body: JSON.stringify({ address, password }) });
-    accounts.push({ address, password, token: null, id: account.id });
+    accounts.push({ address, password, token: null, id: account.id, label: $('label').value.trim().slice(0, 40), createdAt: new Date().toISOString() });
     active = accounts.length - 1;
     await storage.set({ accounts, active });
+    $('new-form').hidden = true;
+    $('label').value = '';
     renderAccount();
     const session = await request('/token', { method: 'POST', body: JSON.stringify({ address, password }) });
     if (!session.token) throw new Error('Address saved. Sign-in will be retried on the next refresh.');
@@ -125,16 +137,18 @@ function renderAccount() {
   const account = current();
   $('accounts').replaceChildren();
   accounts.forEach((item, index) => {
-    const option = new Option(item.address, String(index));
+    const option = new Option(item.label ? `${item.label} · ${item.address}` : item.address, String(index));
     $('accounts').add(option);
   });
   $('accounts').value = String(active);
   $('accounts').hidden = accounts.length === 0;
   $('address').hidden = accounts.length > 0;
+  $('account-label').hidden = !account?.label;
+  $('account-label').textContent = account?.label || '';
   updateButtons();
   if (!account) {
     $('messages').innerHTML = '<div class="empty"><strong>No address yet</strong><p>Create a temporary address for this sign-up.</p><button id="new-empty" class="create-button">Create address</button></div>';
-    $('new-empty').addEventListener('click', createAddress);
+    $('new-empty').addEventListener('click', showCreateForm);
     updateButtons();
     $('count').textContent = 'Inbox';
   }
@@ -317,7 +331,66 @@ async function openMessage(message) {
   } catch (error) { $('body').textContent = error.message || 'Could not load this message.'; }
 }
 
-$('new').addEventListener('click', createAddress);
+async function waitForTab(tabId) {
+  if ((await tabs.get(tabId)).status === 'complete') return;
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => { tabs.onUpdated.removeListener(listener); reject(new Error('The website did not finish loading.')); }, 15000);
+    function listener(id, change) {
+      if (id !== tabId || change.status !== 'complete') return;
+      clearTimeout(timeout); tabs.onUpdated.removeListener(listener); resolve();
+    }
+    tabs.onUpdated.addListener(listener);
+    void tabs.get(tabId).then((tab) => { if (tab.status === 'complete') listener(tabId, { status: 'complete' }); }).catch(() => {});
+  });
+}
+
+async function openDashboard() {
+  const account = current();
+  if (!account?.token || !tabs || !scripting) return;
+  $('dashboard').disabled = true;
+  status('Connecting this address to the website…');
+  try {
+    const page = await tabs.create({ url: 'https://aetherfetch.vercel.app/', active: false });
+    await waitForTab(page.id);
+    const payload = {
+      accounts: accounts.map(({ address, password, label, createdAt }) => ({ address, password, label, createdAt })),
+      session: { token: account.token, email: account.address, password: account.password, accountId: account.id }
+    };
+    const results = await scripting.executeScript({
+      target: { tabId: page.id }, world: 'MAIN', args: [payload],
+      func: (data) => {
+        if (location.origin !== 'https://aetherfetch.vercel.app') return false;
+        try {
+          const raw = JSON.parse(localStorage.getItem('mailbox_saved_accounts') || '[]');
+          const existing = Array.isArray(raw) ? raw : [];
+          const saved = new Map(existing.filter((item) => item && typeof item.address === 'string').map((item) => [item.address, item]));
+          for (const item of data.accounts) {
+            if (!item.address || !item.password) continue;
+            const previous = saved.get(item.address) || {};
+            saved.set(item.address, {
+              ...previous, address: item.address, password: item.password,
+              createdAt: previous.createdAt || item.createdAt || new Date().toISOString(),
+              label: item.label || previous.label || undefined
+            });
+          }
+          localStorage.setItem('mailbox_saved_accounts', JSON.stringify([...saved.values()]));
+          localStorage.setItem('mailbox_session', JSON.stringify(data.session));
+          return true;
+        } catch { return false; }
+      }
+    });
+    if (!results?.[0]?.result) throw new Error('Could not save this address on the website.');
+    await tabs.update(page.id, { url: 'https://aetherfetch.vercel.app/dashboard', active: true });
+  } catch (error) {
+    status(error.message || 'Could not open the dashboard.', true);
+    updateButtons();
+  }
+}
+
+$('new').addEventListener('click', showCreateForm);
+$('dashboard').addEventListener('click', openDashboard);
+$('new-form').addEventListener('submit', (event) => { event.preventDefault(); void createAddress(); });
+$('cancel-new').addEventListener('click', () => { $('new-form').hidden = true; $('label').value = ''; });
 $('refresh').addEventListener('click', () => refresh(true));
 $('copy').addEventListener('click', async () => {
   if (!current()) return;
