@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,13 +8,14 @@
 </head>
 <body>
   <main>
-    <header><img src="icons/icon-48.png" alt="" width="34" height="34"><div><strong>AetherFetch</strong><span>Votre mail temporaire, en un clic.</span></div></header>
-    <a class="primary" href="https://aetherfetch.vercel.app/dashboard" target="_blank" rel="noopener noreferrer">Ouvrir ma boîte <span aria-hidden="true">↗</span></a>
-    <nav aria-label="Accès rapides">
-      <a href="https://aetherfetch.vercel.app/accounts" target="_blank" rel="noopener noreferrer">Mes comptes <span aria-hidden="true">↗</span></a>
-      <a href="https://aetherfetch.vercel.app/register" target="_blank" rel="noopener noreferrer">Créer une adresse <span aria-hidden="true">↗</span></a>
-    </nav>
-    <footer><a href="https://aetherfetch.vercel.app/docs" target="_blank" rel="noopener noreferrer">Guide d’utilisation</a><span>by qbpg</span></footer>
+    <header class="top"><img src="logo.svg" alt="" width="32" height="32"><div><strong>AetherFetch</strong><small>Temporary inbox</small></div><button id="new" class="icon" title="Create a new address" aria-label="Create a new address">＋</button></header>
+    <section class="account" aria-label="Current address"><div class="eyebrow">YOUR ADDRESS</div><div class="address-row"><select id="accounts" aria-label="Choose an address" hidden></select><span id="address">Create an address to get started</span><button id="copy" title="Copy address" disabled>Copy</button></div></section>
+    <div class="toolbar"><span id="count">Inbox</span><button id="refresh" disabled>Refresh</button></div>
+    <div id="status" role="status" aria-live="polite"></div>
+    <div id="messages" class="messages"></div>
+    <article id="detail" hidden><button id="back" class="back">← Inbox</button><h2 id="subject"></h2><p id="sender"></p><div id="verification" hidden></div><div id="body"></div></article>
+    <footer><span>Messages refresh while this popup is open.</span><a href="https://aetherfetch.vercel.app/" target="_blank" rel="noopener noreferrer">Open website ↗</a></footer>
   </main>
+  <script src="popup.js"></script>
 </body>
 </html>
