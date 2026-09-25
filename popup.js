@@ -223,6 +223,66 @@ function verificationInfo(message, documentNode) {
   return { code, link: match ? new URL(match.href).href : null };
 }
 
+function safeWebUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch { return null; }
+}
+
+function renderMessageBody(detail, parsed) {
+  const body = $('body');
+  body.replaceChildren();
+  const content = detail.text || parsed?.body?.textContent?.trim() || detail.intro || 'This message has no text.';
+  const found = new Set();
+  const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+  let offset = 0;
+  for (const match of content.matchAll(urlPattern)) {
+    body.append(document.createTextNode(content.slice(offset, match.index)));
+    const raw = match[0];
+    const clean = raw.replace(/[),.;!?]+$/, '');
+    const url = safeWebUrl(clean);
+    if (url) {
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      anchor.textContent = clean;
+      anchor.title = `Open ${new URL(url).hostname} in a new tab`;
+      body.append(anchor);
+      found.add(url);
+    } else body.append(document.createTextNode(clean));
+    body.append(document.createTextNode(raw.slice(clean.length)));
+    offset = match.index + raw.length;
+  }
+  body.append(document.createTextNode(content.slice(offset)));
+
+  const links = [];
+  for (const element of parsed?.querySelectorAll('a[href]') || []) {
+    const url = safeWebUrl(element.getAttribute('href'));
+    if (!url || found.has(url)) continue;
+    found.add(url);
+    links.push({ url, label: element.textContent?.trim() || 'Open link' });
+    if (links.length >= 30) break;
+  }
+  if (links.length) {
+    const group = document.createElement('div');
+    group.className = 'mail-links';
+    const heading = document.createElement('strong');
+    heading.textContent = 'Links in this message';
+    group.append(heading);
+    for (const { url, label } of links) {
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+      anchor.textContent = `${label.slice(0, 80)} ↗ (${new URL(url).hostname})`;
+      group.append(anchor);
+    }
+    body.append(group);
+  }
+}
+
 async function openMessage(message) {
   const account = current();
   if (!account) return;
@@ -237,7 +297,7 @@ async function openMessage(message) {
     if (selectedMessage !== message.id) return;
     const html = Array.isArray(detail.html) ? detail.html.join(' ') : (detail.html || '');
     const parsed = html ? new DOMParser().parseFromString(html, 'text/html') : null;
-    $('body').textContent = detail.text || parsed?.body?.textContent?.trim() || detail.intro || 'This message has no text.';
+    renderMessageBody(detail, parsed);
     const { code, link } = verificationInfo(detail, parsed);
     const box = $('verification'); box.replaceChildren();
     if (code) {
