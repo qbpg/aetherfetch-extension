@@ -9,12 +9,13 @@
 <body>
   <main>
     <header class="top"><img src="logo.svg" alt="" width="32" height="32"><div><strong>AetherFetch</strong><small>Temporary inbox</small></div><button id="new" class="icon" title="Create a new address" aria-label="Create a new address">＋</button></header>
-    <section class="account" aria-label="Current address"><div class="eyebrow">YOUR ADDRESS</div><div class="address-row"><select id="accounts" aria-label="Choose an address" hidden></select><span id="address">Create an address to get started</span><button id="copy" title="Copy address" disabled>Copy</button></div></section>
+    <section class="account" aria-label="Current address"><div class="eyebrow">YOUR ADDRESS</div><div class="address-row"><select id="accounts" aria-label="Choose an address" hidden></select><span id="address">Create an address to get started</span><button id="copy" title="Copy address" disabled>Copy</button></div><small id="account-label" hidden></small><button id="dashboard" class="dashboard" disabled>Open dashboard ↗</button></section>
+    <form id="new-form" class="new-form" hidden><label for="label">Label <span>(optional)</span></label><input id="label" type="text" maxlength="40" autocomplete="off" placeholder="e.g. Shopping, Gaming"><div class="form-actions"><button type="button" id="cancel-new">Cancel</button><button type="submit" id="create" class="create-button">Create address</button></div></form>
     <div class="toolbar"><span id="count">Inbox</span><button id="refresh" disabled>Refresh</button></div>
     <div id="status" role="status" aria-live="polite"></div>
     <div id="messages" class="messages"></div>
     <article id="detail" hidden><button id="back" class="back">← Inbox</button><h2 id="subject"></h2><p id="sender"></p><div id="verification" hidden></div><div id="body"></div></article>
-    <footer><span>Messages refresh while this popup is open.</span><a href="https://aetherfetch.vercel.app/" target="_blank" rel="noopener noreferrer">Open website ↗</a></footer>
+    <footer><span>Messages refresh while this popup is open.</span><a href="https://aetherfetch.vercel.app/" target="_blank" rel="noopener noreferrer">Website ↗</a></footer>
   </main>
   <script src="popup.js"></script>
 </body>
