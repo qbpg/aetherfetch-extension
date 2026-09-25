@@ -1,5 +1,5 @@
-/* AetherFetch popup: no page injection, external scripts, or HTML rendering. */
-const API = 'https://aetherfetch.vercel.app/api/mailbox';
+/* AetherFetch popup: mail.tm access and user-initiated website handoff. */
+const API = 'https://api.mail.tm';
 const storage = globalThis.chrome?.storage?.local || globalThis.browser?.storage?.local;
 const tabs = globalThis.browser?.tabs || globalThis.chrome?.tabs;
 const scripting = globalThis.browser?.scripting || globalThis.chrome?.scripting;
@@ -8,35 +8,21 @@ let accounts = [];
 let active = 0;
 let loading = false;
 let lastFetch = 0;
-let retryAt = 0;
-let rateLimitHits = 0;
+let rateLimited = false;
 let domainCache = null;
 let inboxCache = null;
 let refreshing = false;
 let selectedMessage = null;
 const MIN_REFRESH_MS = 30000;
 
-function remaining() { return Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)); }
-
 function updateButtons() {
-  const waiting = remaining() > 0;
-  $('new').disabled = !storage || loading || waiting;
-  $('create').disabled = !storage || loading || waiting;
-  $('refresh').disabled = !current() || loading || refreshing || waiting;
+  $('new').disabled = !storage || loading;
+  $('create').disabled = !storage || loading;
+  $('refresh').disabled = !current() || loading || refreshing;
   $('copy').disabled = !current();
   $('dashboard').disabled = !current()?.token || !tabs || !scripting;
   const emptyButton = $('new-empty');
-  if (emptyButton) emptyButton.disabled = !storage || loading || waiting;
-}
-
-function updateCooldown() {
-  updateButtons();
-  if (remaining()) {
-    const seconds = remaining();
-    status(`Mail service is busy. Try again in ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}.`, true);
-  } else if ($('status').textContent.startsWith('Mail service is busy.')) {
-    status('You can try again now.');
-  }
+  if (emptyButton) emptyButton.disabled = !storage || loading;
 }
 
 function status(message = '', error = false) {
@@ -47,7 +33,6 @@ function status(message = '', error = false) {
 function current() { return accounts[active] || null; }
 
 async function request(path, options = {}) {
-  if (remaining()) throw new Error('Mail service is busy. Please wait.');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
@@ -58,23 +43,12 @@ async function request(path, options = {}) {
       cache: 'no-store'
     });
     if (response.status === 429) {
-      const after = response.headers.get('Retry-After');
-      const seconds = Number(after);
-      const date = Date.parse(after || '');
-      rateLimitHits = Math.min(rateLimitHits + 1, 5);
-      const fallback = Math.min(600000, 60000 * 2 ** (rateLimitHits - 1));
-      const delay = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : Number.isFinite(date) ? date - Date.now() : fallback;
-      retryAt = Date.now() + Math.min(600000, Math.max(1000, delay));
-      await storage?.set({ retryAt, rateLimitHits });
-      updateCooldown();
-      throw new Error('Mail service is busy. Please wait.');
+      rateLimited = true;
+      throw new Error('mail.tm is limiting requests from this connection. Try again shortly.');
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || data.message || data.error || `Request failed (${response.status})`);
-    if (rateLimitHits) {
-      rateLimitHits = 0;
-      await storage?.set({ rateLimitHits: 0 });
-    }
+    rateLimited = false;
     return data;
   } catch (error) {
     if (error.name === 'AbortError') throw new Error('The server took too long to respond.');
@@ -94,13 +68,13 @@ function members(data) {
 }
 
 function showCreateForm() {
-  if (loading || remaining() || !storage) return;
+  if (loading || !storage) return;
   $('new-form').hidden = false;
   $('label').focus();
 }
 
 async function createAddress() {
-  if (loading || !storage || remaining()) return;
+  if (loading || !storage) return;
   loading = true; updateButtons(); status('Creating your address…');
   try {
     let domains = domainCache?.expires > Date.now() ? domainCache.list : null;
@@ -128,8 +102,7 @@ async function createAddress() {
     const checked = await refresh(true);
     if (checked) status('Address ready. Copy it to your sign-up form.');
   } catch (error) {
-    if (remaining()) updateCooldown();
-    else status(error.message || 'Could not create an address.', true);
+    status(error.message || 'Could not create an address.', true);
   } finally { loading = false; updateButtons(); }
 }
 
@@ -184,7 +157,7 @@ function renderMessages(messages) {
 
 async function refresh(force = false) {
   const account = current();
-  if (!account || loading || refreshing || remaining()) return false;
+  if (!account || loading || refreshing) return false;
   if (Date.now() - lastFetch < MIN_REFRESH_MS) {
     if (force) status('Checked recently. Please wait a moment before refreshing.');
     return false;
@@ -218,8 +191,7 @@ async function refresh(force = false) {
     status('Inbox is up to date.');
     return true;
   } catch (error) {
-    if (remaining()) updateCooldown();
-    else status(error.message || 'Could not check the inbox.', true);
+    status(error.message || 'Could not check the inbox.', true);
     return false;
   } finally {
     refreshing = false; updateButtons();
@@ -427,11 +399,9 @@ $('back').addEventListener('click', () => {
     return;
   }
   try {
-    const stored = await storage.get(['accounts', 'active', 'retryAt', 'rateLimitHits', 'domainCache', 'inboxCache']);
+    const stored = await storage.get(['accounts', 'active', 'domainCache', 'inboxCache']);
     accounts = Array.isArray(stored.accounts) ? stored.accounts : [];
     active = Math.min(Math.max(Number(stored.active) || 0, 0), Math.max(accounts.length - 1, 0));
-    retryAt = Number(stored.retryAt) || 0;
-    rateLimitHits = Number(stored.rateLimitHits) || 0;
     domainCache = stored.domainCache || null;
     inboxCache = stored.inboxCache || null;
     renderAccount();
@@ -440,10 +410,8 @@ $('back').addEventListener('click', () => {
         renderMessages(inboxCache.messages);
         lastFetch = inboxCache.at;
       } else renderMessages([]);
-      if (!remaining()) await refresh();
+      await refresh();
     }
-    updateCooldown();
   } catch (error) { status('Could not access browser storage. Reload or reinstall the extension.', true); }
-  setInterval(updateCooldown, 1000);
-  setInterval(() => { if (current()) void refresh(); }, 60000);
+  setInterval(() => { if (current() && !rateLimited) void refresh(); }, 60000);
 })();
