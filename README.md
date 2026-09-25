@@ -12,7 +12,8 @@ A temporary inbox inside a browser popup for **Microsoft Edge and Mozilla Firefo
 - Switch between addresses created in the extension.
 - Check incoming messages in the popup and read plain text or text extracted from HTML mail.
 - Detect verification codes and relevant activation links. Links open only when clicked, in a new tab; the destination domain is shown first.
-- Refresh every 60 seconds **while the popup is open**, with a retry delay after rate limiting.
+- Refresh every 60 seconds **while the popup is open**. Recent results and available domains are cached to avoid repeated API requests.
+- If the mail service returns a rate limit, display a countdown and pause address creation and refresh across popup reopenings. The copy button remains available for an address already created.
 
 The extension uses [AetherFetch's existing mailbox API](https://aetherfetch.vercel.app/) and its mail.tm-backed delivery. Addresses created in the extension are separate from those saved on the website. There is no automatic access to the current tab, no code injection into websites, and no background polling.
 
