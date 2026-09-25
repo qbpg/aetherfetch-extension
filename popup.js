@@ -1,6 +1,6 @@
 /* AetherFetch popup: no page injection, external scripts, or HTML rendering. */
 const API = 'https://aetherfetch.vercel.app/api/mailbox';
-const ext = globalThis.browser || globalThis.chrome;
+const storage = globalThis.chrome?.storage?.local || globalThis.browser?.storage?.local;
 const $ = (id) => document.getElementById(id);
 let accounts = [];
 let active = 0;
@@ -55,7 +55,7 @@ function members(data) {
 }
 
 async function createAddress() {
-  if (loading) return;
+  if (loading || !storage) return;
   loading = true; $('new').disabled = true; status('Creating your address…');
   try {
     const domains = members(await request('/domains')).filter((d) => d.isActive);
@@ -68,7 +68,7 @@ async function createAddress() {
     if (!session.token) throw new Error('Address created, but sign-in failed. Open the website to recover it.');
     accounts.push({ address, password, token: session.token, id: account.id });
     active = accounts.length - 1;
-    await ext.storage.local.set({ accounts, active });
+    await storage.set({ accounts, active });
     renderAccount();
     lastFetch = 0;
     await refresh(true);
@@ -138,7 +138,7 @@ async function refresh(force = false, renewed = false) {
       try {
         const renewed = await request('/token', { method: 'POST', body: JSON.stringify({ address: account.address, password: account.password }) });
         account.token = renewed.token;
-        await ext.storage.local.set({ accounts });
+        await storage.set({ accounts });
         lastFetch = 0;
         return refresh(true, true);
       } catch { /* show original error */ }
@@ -204,7 +204,7 @@ $('accounts').addEventListener('change', async (event) => {
   active = Number(event.target.value);
   selectedMessage = null;
   $('detail').hidden = true; $('messages').hidden = false;
-  await ext.storage.local.set({ active });
+  await storage.set({ active });
   lastFetch = 0;
   renderMessages([]);
   await refresh(true);
@@ -215,12 +215,18 @@ $('back').addEventListener('click', () => {
 });
 
 (async () => {
+  renderAccount();
+  if (!storage) {
+    $('new').disabled = true;
+    status('Browser storage is unavailable. Install the extension from its folder, then open it from the toolbar.', true);
+    return;
+  }
   try {
-    const stored = await ext.storage.local.get(['accounts', 'active']);
+    const stored = await storage.get(['accounts', 'active']);
     accounts = Array.isArray(stored.accounts) ? stored.accounts : [];
     active = Math.min(Math.max(Number(stored.active) || 0, 0), Math.max(accounts.length - 1, 0));
     renderAccount();
     if (current()) await refresh(true);
-  } catch (error) { status(error.message || 'Could not open the inbox.', true); }
+  } catch (error) { status('Could not access browser storage. Reload or reinstall the extension.', true); }
   setInterval(() => { if (current()) void refresh(); }, 60000);
 })();
