@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AetherFetch – Temporary Inbox",
   "description": "Create a temporary email address and read verification codes and links in a popup.",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "permissions": ["storage"],
   "host_permissions": ["https://aetherfetch.vercel.app/*"],
   "action": {
