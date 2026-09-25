@@ -1,1 +1,23 @@
-{}
+{
+  "manifest_version": 3,
+  "name": "AetherFetch",
+  "description": "Accès rapide à votre boîte mail temporaire AetherFetch.",
+  "version": "1.0.0",
+  "action": {
+    "default_title": "Ouvrir AetherFetch",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png" }
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "extension@aetherfetch.app",
+      "strict_min_version": "109.0"
+    }
+  }
+}
