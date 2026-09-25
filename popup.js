@@ -7,7 +7,33 @@ let active = 0;
 let loading = false;
 let lastFetch = 0;
 let retryAt = 0;
+let rateLimitHits = 0;
+let domainCache = null;
+let inboxCache = null;
+let refreshing = false;
 let selectedMessage = null;
+const MIN_REFRESH_MS = 30000;
+
+function remaining() { return Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)); }
+
+function updateButtons() {
+  const waiting = remaining() > 0;
+  $('new').disabled = !storage || loading || waiting;
+  $('refresh').disabled = !current() || loading || refreshing || waiting;
+  $('copy').disabled = !current();
+  const emptyButton = $('new-empty');
+  if (emptyButton) emptyButton.disabled = !storage || loading || waiting;
+}
+
+function updateCooldown() {
+  updateButtons();
+  if (remaining()) {
+    const seconds = remaining();
+    status(`Mail service is busy. Try again in ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}.`, true);
+  } else if ($('status').textContent.startsWith('Mail service is busy.')) {
+    status('You can try again now.');
+  }
+}
 
 function status(message = '', error = false) {
   $('status').textContent = message;
@@ -17,7 +43,7 @@ function status(message = '', error = false) {
 function current() { return accounts[active] || null; }
 
 async function request(path, options = {}) {
-  if (Date.now() < retryAt) throw new Error('Too many requests. Try again shortly.');
+  if (remaining()) throw new Error('Mail service is busy. Please wait.');
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
   try {
@@ -31,11 +57,20 @@ async function request(path, options = {}) {
       const after = response.headers.get('Retry-After');
       const seconds = Number(after);
       const date = Date.parse(after || '');
-      retryAt = Date.now() + Math.min(300000, Math.max(1000, Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : Number.isFinite(date) ? date - Date.now() : 60000));
-      throw new Error('Rate limited. Please wait before trying again.');
+      rateLimitHits = Math.min(rateLimitHits + 1, 5);
+      const fallback = Math.min(600000, 60000 * 2 ** (rateLimitHits - 1));
+      const delay = Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : Number.isFinite(date) ? date - Date.now() : fallback;
+      retryAt = Date.now() + Math.min(600000, Math.max(1000, delay));
+      await storage?.set({ retryAt, rateLimitHits });
+      updateCooldown();
+      throw new Error('Mail service is busy. Please wait.');
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || data.message || data.error || `Request failed (${response.status})`);
+    if (rateLimitHits) {
+      rateLimitHits = 0;
+      await storage?.set({ rateLimitHits: 0 });
+    }
     return data;
   } catch (error) {
     if (error.name === 'AbortError') throw new Error('The server took too long to respond.');
@@ -55,26 +90,35 @@ function members(data) {
 }
 
 async function createAddress() {
-  if (loading || !storage) return;
-  loading = true; $('new').disabled = true; status('Creating your address…');
+  if (loading || !storage || remaining()) return;
+  loading = true; updateButtons(); status('Creating your address…');
   try {
-    const domains = members(await request('/domains')).filter((d) => d.isActive);
+    let domains = domainCache?.expires > Date.now() ? domainCache.list : null;
+    if (!domains) {
+      domains = members(await request('/domains')).filter((d) => d.isActive);
+      domainCache = { list: domains, expires: Date.now() + 30 * 60 * 1000 };
+      await storage.set({ domainCache });
+    }
     if (!domains.length) throw new Error('No email domain is available right now.');
     const domain = domains[crypto.getRandomValues(new Uint8Array(1))[0] % domains.length].domain;
     const address = `${randomPart()}@${domain}`;
     const password = `${randomPart(16)}A1!`;
     const account = await request('/accounts', { method: 'POST', body: JSON.stringify({ address, password }) });
-    const session = await request('/token', { method: 'POST', body: JSON.stringify({ address, password }) });
-    if (!session.token) throw new Error('Address created, but sign-in failed. Open the website to recover it.');
-    accounts.push({ address, password, token: session.token, id: account.id });
+    accounts.push({ address, password, token: null, id: account.id });
     active = accounts.length - 1;
     await storage.set({ accounts, active });
     renderAccount();
-    lastFetch = 0;
-    await refresh(true);
-    status('Address ready. Copy it to your sign-up form.');
-  } catch (error) { status(error.message || 'Could not create an address.', true); }
-  finally { loading = false; $('new').disabled = false; }
+    const session = await request('/token', { method: 'POST', body: JSON.stringify({ address, password }) });
+    if (!session.token) throw new Error('Address saved. Sign-in will be retried on the next refresh.');
+    current().token = session.token;
+    await storage.set({ accounts });
+    loading = false; updateButtons();
+    const checked = await refresh(true);
+    if (checked) status('Address ready. Copy it to your sign-up form.');
+  } catch (error) {
+    if (remaining()) updateCooldown();
+    else status(error.message || 'Could not create an address.', true);
+  } finally { loading = false; updateButtons(); }
 }
 
 function renderAccount() {
@@ -87,9 +131,11 @@ function renderAccount() {
   $('accounts').value = String(active);
   $('accounts').hidden = accounts.length === 0;
   $('address').hidden = accounts.length > 0;
-  $('copy').disabled = $('refresh').disabled = !account;
+  updateButtons();
   if (!account) {
-    $('messages').innerHTML = '<div class="empty"><strong>No address yet</strong>Press + to create your temporary inbox.</div>';
+    $('messages').innerHTML = '<div class="empty"><strong>No address yet</strong><p>Create a temporary address for this sign-up.</p><button id="new-empty" class="create-button">Create address</button></div>';
+    $('new-empty').addEventListener('click', createAddress);
+    updateButtons();
     $('count').textContent = 'Inbox';
   }
 }
@@ -122,28 +168,47 @@ function renderMessages(messages) {
   }
 }
 
-async function refresh(force = false, renewed = false) {
+async function refresh(force = false) {
   const account = current();
-  if (!account || loading && !force || Date.now() - lastFetch < 10000 && !force) return;
+  if (!account || loading || refreshing || remaining()) return false;
+  if (Date.now() - lastFetch < MIN_REFRESH_MS) {
+    if (force) status('Checked recently. Please wait a moment before refreshing.');
+    return false;
+  }
   const accountIndex = active;
-  lastFetch = Date.now();
+  refreshing = true; updateButtons();
   status('Checking inbox…');
   try {
-    const data = await request('/messages?page=1', { headers: { Authorization: `Bearer ${account.token}` } });
-    if (accountIndex !== active) return;
-    renderMessages(members(data));
-    status('Inbox is up to date.');
-  } catch (error) {
-    if (!renewed && /401|403/.test(error.message) && account.password) {
-      try {
-        const renewed = await request('/token', { method: 'POST', body: JSON.stringify({ address: account.address, password: account.password }) });
-        account.token = renewed.token;
-        await storage.set({ accounts });
-        lastFetch = 0;
-        return refresh(true, true);
-      } catch { /* show original error */ }
+    if (!account.token) {
+      const session = await request('/token', { method: 'POST', body: JSON.stringify({ address: account.address, password: account.password }) });
+      account.token = session.token;
+      await storage.set({ accounts });
     }
-    status(error.message || 'Could not check the inbox.', true);
+    if (!account.token) throw new Error('Could not sign in to this inbox.');
+    let data;
+    try {
+      data = await request('/messages?page=1', { headers: { Authorization: `Bearer ${account.token}` } });
+    } catch (error) {
+      if (!/401|403/.test(error.message) || !account.password) throw error;
+      const session = await request('/token', { method: 'POST', body: JSON.stringify({ address: account.address, password: account.password }) });
+      account.token = session.token;
+      await storage.set({ accounts });
+      data = await request('/messages?page=1', { headers: { Authorization: `Bearer ${account.token}` } });
+    }
+    if (accountIndex !== active) return false;
+    const messages = members(data);
+    renderMessages(messages);
+    lastFetch = Date.now();
+    inboxCache = { address: account.address, messages, at: lastFetch };
+    await storage.set({ inboxCache });
+    status('Inbox is up to date.');
+    return true;
+  } catch (error) {
+    if (remaining()) updateCooldown();
+    else status(error.message || 'Could not check the inbox.', true);
+    return false;
+  } finally {
+    refreshing = false; updateButtons();
   }
 }
 
@@ -196,17 +261,24 @@ $('new').addEventListener('click', createAddress);
 $('refresh').addEventListener('click', () => refresh(true));
 $('copy').addEventListener('click', async () => {
   if (!current()) return;
-  await navigator.clipboard.writeText(current().address);
-  $('copy').textContent = 'Copied';
-  setTimeout(() => { $('copy').textContent = 'Copy'; }, 1800);
+  try {
+    await navigator.clipboard.writeText(current().address);
+    $('copy').textContent = 'Copied';
+    setTimeout(() => { $('copy').textContent = 'Copy'; }, 1800);
+  } catch { status('Could not copy. Select the address and copy it manually.', true); }
 });
 $('accounts').addEventListener('change', async (event) => {
   active = Number(event.target.value);
   selectedMessage = null;
   $('detail').hidden = true; $('messages').hidden = false;
   await storage.set({ active });
-  lastFetch = 0;
-  renderMessages([]);
+  if (inboxCache?.address === current()?.address) {
+    renderMessages(inboxCache.messages);
+    lastFetch = inboxCache.at;
+  } else {
+    lastFetch = 0;
+    renderMessages([]);
+  }
   await refresh(true);
 });
 $('back').addEventListener('click', () => {
@@ -222,11 +294,23 @@ $('back').addEventListener('click', () => {
     return;
   }
   try {
-    const stored = await storage.get(['accounts', 'active']);
+    const stored = await storage.get(['accounts', 'active', 'retryAt', 'rateLimitHits', 'domainCache', 'inboxCache']);
     accounts = Array.isArray(stored.accounts) ? stored.accounts : [];
     active = Math.min(Math.max(Number(stored.active) || 0, 0), Math.max(accounts.length - 1, 0));
+    retryAt = Number(stored.retryAt) || 0;
+    rateLimitHits = Number(stored.rateLimitHits) || 0;
+    domainCache = stored.domainCache || null;
+    inboxCache = stored.inboxCache || null;
     renderAccount();
-    if (current()) await refresh(true);
+    if (current()) {
+      if (inboxCache?.address === current().address) {
+        renderMessages(inboxCache.messages);
+        lastFetch = inboxCache.at;
+      } else renderMessages([]);
+      if (!remaining()) await refresh();
+    }
+    updateCooldown();
   } catch (error) { status('Could not access browser storage. Reload or reinstall the extension.', true); }
+  setInterval(updateCooldown, 1000);
   setInterval(() => { if (current()) void refresh(); }, 60000);
 })();
