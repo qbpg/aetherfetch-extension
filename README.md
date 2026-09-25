@@ -24,6 +24,8 @@ The extension uses [AetherFetch's existing mailbox API](https://aetherfetch.verc
 2. Open `edge://extensions`, switch on **Developer mode**, and click **Load unpacked**.
 3. Select the extracted directory containing `manifest.json`.
 
+Open AetherFetch from the browser toolbar. Opening `popup.html` as a normal web page does not provide extension storage or API permissions.
+
 ### Firefox
 
 1. Download the repository as a ZIP and extract it.
