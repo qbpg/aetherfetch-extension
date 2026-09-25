@@ -18,9 +18,9 @@ Create a temporary inbox right in your browser. Copy the address into a sign-up 
 - Create several temporary addresses, each with an optional label.
 - Read messages and open links from plain-text or HTML email.
 - Click **Open dashboard** to add the extension's addresses to [AetherFetch](https://aetherfetch.vercel.app/) in the same browser profile. The selected address becomes the active website session. Existing website accounts and their favorites or archived state are preserved.
-- Refresh while the popup is open, with cached results and a countdown when the mail service is rate limited.
+- Refresh while the popup is open, with cached results. If mail.tm limits requests, the extension shows the error and stops automatic refresh attempts until the popup is reopened or a manual request succeeds.
 
-Addresses are shared with the website **when you click Open dashboard**. The extension only accesses the AetherFetch domain. It does not inject code into the other websites you visit.
+Addresses are shared with the website **when you click Open dashboard**. The extension requests access only to AetherFetch for that transfer and to [mail.tm](https://mail.tm/) for inbox delivery. It does not inject code into the other websites you visit.
 
 ## Install
 
@@ -36,7 +36,7 @@ Open AetherFetch from the toolbar. Opening `popup.html` directly does not grant 
 
 ## Privacy
 
-The extension stores its addresses, labels, generated passwords, and access tokens in browser `storage.local`. It uses AetherFetch's existing mail.tm-backed API. When you click **Open dashboard**, it copies those accounts to the website's own `localStorage` and activates the selected session. Anyone with access to your browser profile may be able to access saved inboxes. Avoid temporary email for important or long-term accounts. See [Privacy details](PRIVACY.md).
+The extension stores its addresses, labels, generated passwords, and access tokens in browser `storage.local`. It connects directly to [mail.tm](https://mail.tm/) for temporary email, avoiding the website's shared proxy. When you click **Open dashboard**, it copies those accounts to the website's own `localStorage` and activates the selected session. Anyone with access to your browser profile may be able to access saved inboxes. Avoid temporary email for important or long-term accounts. See [Privacy details](PRIVACY.md).
 
 ## License
 
