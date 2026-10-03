@@ -16,9 +16,9 @@ Create a temporary inbox right in your browser. Copy the address into a sign-up 
 ## Built with
 
 <p align="center">
-  <img src="https://skillicons.dev/icons?i=js&theme=dark" alt="JavaScript" title="JavaScript" width="36" height="36">
-  <img src="https://skillicons.dev/icons?i=html&theme=dark" alt="HTML" title="HTML" width="36" height="36">
-  <img src="https://skillicons.dev/icons?i=css&theme=dark" alt="CSS" title="CSS" width="36" height="36">
+  <img src="https://img.shields.io/badge/JavaScript-323330?style=for-the-badge&amp;logo=javascript&amp;logoColor=F7DF1E" alt="JavaScript" height="28">
+  <img src="https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&amp;logo=html5&amp;logoColor=white" alt="HTML" height="28">
+  <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&amp;logo=css&amp;logoColor=white" alt="CSS" height="28">
 </p>
 
 Manifest V3, browser storage, and the mail.tm API. Version 2.1.1; Firefox requires version 140 or later.
