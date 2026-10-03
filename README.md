@@ -3,7 +3,7 @@
 # AetherFetch Extension
 
 <p align="center">
-  <a href="https://addons.mozilla.org/"><img alt="Mozilla" src="https://img.shields.io/badge/Mozilla-compatible-111111?style=for-the-badge&logo=mozilla&logoColor=white"></a>
+  <a href="#mozilla-browsers-firefox-and-librewolf"><img alt="Mozilla" src="https://img.shields.io/badge/Mozilla-compatible-111111?style=for-the-badge&logo=mozilla&logoColor=white"></a>
   <a href="https://librewolf.net/"><img alt="LibreWolf" src="https://img.shields.io/badge/LibreWolf-compatible-111111?style=for-the-badge&logo=librewolf&logoColor=white"></a>
   <a href="#microsoft-edge"><img alt="Microsoft Edge" src="https://img.shields.io/badge/Microsoft%20Edge-manual%20install-111111?style=for-the-badge&logo=microsoftedge&logoColor=white"></a>
   <a href="https://vercel.com/"><img alt="Vercel" src="https://img.shields.io/badge/Vercel-web%20app-111111?style=for-the-badge&logo=vercel&logoColor=white"></a>
@@ -12,6 +12,16 @@
 ![AetherFetch extension banner](banner.png)
 
 Create a temporary inbox right in your browser. Copy the address into a sign-up form, read incoming mail, copy verification codes, and open links from messages. Built for Mozilla-based browsers and Microsoft Edge.
+
+## Built with
+
+<p align="center">
+  <img src="https://skillicons.dev/icons?i=js&theme=dark" alt="JavaScript" title="JavaScript" width="36" height="36">
+  <img src="https://skillicons.dev/icons?i=html&theme=dark" alt="HTML" title="HTML" width="36" height="36">
+  <img src="https://skillicons.dev/icons?i=css&theme=dark" alt="CSS" title="CSS" width="36" height="36">
+</p>
+
+Manifest V3, browser storage, and the mail.tm API. Version 2.1.1; Firefox requires version 140 or later.
 
 ## What it does
 
@@ -41,3 +51,5 @@ The extension stores its addresses, labels, generated passwords, and access toke
 ## License
 
 [MIT](LICENSE) · Created by **qbpg**.
+
+<p align="center"><a href="https://qbpg.space/"><img src="https://raw.githubusercontent.com/qbpg/qbpg/main/assets/portfolio.svg" alt="Portfolio - QBPG" width="188" height="36"></a></p>
