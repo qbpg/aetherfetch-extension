@@ -1,3 +1,7 @@
+<!-- qbpg-logo:start -->
+<p align="right"><a href="https://qbpg.space/"><img src="assets/qbpg-logo.svg" alt="qbpg" width="32" height="32"></a></p>
+<!-- qbpg-logo:end -->
+
 <p align="center"><img src="logo.svg" alt="AetherFetch logo" width="68"></p>
 
 # AetherFetch Extension
