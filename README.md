@@ -52,4 +52,4 @@ The extension stores its addresses, labels, generated passwords, and access toke
 
 [MIT](LICENSE) · Created by **qbpg**.
 
-<p align="center"><a href="https://qbpg.space/"><img src="https://raw.githubusercontent.com/qbpg/qbpg/46238df45b256cde3c09e0dc658364376efe0dcc/assets/portfolio.svg" alt="Portfolio : qbpg.space" width="202" height="28"></a></p>
+<p align="center"><a href="https://qbpg.space/"><img src="https://img.shields.io/badge/Portfolio-qbpg.space-000000?style=flat-square&amp;logo=About.me&amp;logoColor=white&amp;labelColor=000000" alt="Portfolio — qbpg.space" height="28"></a></p>
